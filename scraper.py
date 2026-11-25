@@ -1,16 +1,14 @@
 import hashlib
 import json
 from datetime import datetime, timezone, timedelta
-import requests
+from curl_cffi import requests
 from bs4 import BeautifulSoup
 
 URL = "https://energy-ua.info/cherga/6-1"
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-}
 
 def main():
-    resp = requests.get(URL, headers=HEADERS, timeout=20)
+    # impersonate="chrome" подменяет TLS-отпечаток и заголовки под настоящий Chrome
+    resp = requests.get(URL, impersonate="chrome", timeout=20)
     resp.raise_for_status()
 
     soup = BeautifulSoup(resp.text, "html.parser")
@@ -39,12 +37,10 @@ def main():
             "has_power": has_power
         })
 
-    # Считаем хэш только от списка интервалов, чтобы отслеживать реальные изменения графика
     schedule_hash = hashlib.md5(
         json.dumps(periods, sort_keys=True).encode("utf-8")
     ).hexdigest()
 
-    # Время обновления по Киеву (UTC+2 зимой)
     kyiv_tz = timezone(timedelta(hours=2))
     now_str = datetime.now(kyiv_tz).strftime("%Y-%m-%d %H:%M:%S")
 
