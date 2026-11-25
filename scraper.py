@@ -1,20 +1,29 @@
 import hashlib
 import json
 from datetime import datetime, timezone, timedelta
-from curl_cffi import requests
 from bs4 import BeautifulSoup
+from playwright.sync_api import sync_playwright
 
 URL = "https://energy-ua.info/cherga/6-1"
 
 def main():
-    # impersonate="chrome" подменяет TLS-отпечаток и заголовки под настоящий Chrome
-    resp = requests.get(URL, impersonate="chrome", timeout=20)
-    resp.raise_for_status()
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            locale="uk-UA"
+        )
+        page = context.new_page()
+        page.goto(URL, wait_until="domcontentloaded", timeout=30000)
+        # Ждём появления блока с периодами (до 15 секунд, если сработает JS-проверка)
+        page.wait_for_selector("#periodList", timeout=15000)
+        html = page.content()
+        browser.close()
 
-    soup = BeautifulSoup(resp.text, "html.parser")
+    soup = BeautifulSoup(html, "html.parser")
     period_list = soup.find("div", id="periodList")
     if not period_list:
-        raise RuntimeError("Не найден блок #periodList — проверь разметку или доступность сайта")
+        raise RuntimeError("Блок #periodList не найден")
 
     periods = []
     for row in period_list.find_all("div", class_="period-row"):
